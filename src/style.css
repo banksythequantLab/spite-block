@@ -1,0 +1,38 @@
+:root{--gold:#e2b25a;--ink:#f3e6cc;--panel:rgba(18,12,20,.72)}
+html,body{margin:0;height:100%;background:#15111a;color:var(--ink);font:14px/1.45 "Avenir Next","Segoe UI",system-ui,sans-serif;overflow:hidden}
+#hud{position:fixed;top:14px;left:14px;width:330px;background:var(--panel);backdrop-filter:blur(10px);padding:14px 16px;border-radius:16px;border:1px solid rgba(226,178,90,.35);box-shadow:0 10px 40px #0008;z-index:2}
+.title{font:700 26px/1 Georgia,serif;letter-spacing:.18em;color:var(--gold);text-shadow:0 0 18px rgba(226,178,90,.35)}
+.title span{color:#b8314a;margin-left:.3em}
+label{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#a99577}
+.stats{display:flex;gap:18px;margin:10px 0 6px}
+.stats div{display:flex;flex-direction:column}
+.stats b{font:700 22px Georgia,serif;color:#fff;font-variant-numeric:tabular-nums}
+#score{display:inline-block;transform-origin:left center}
+#score.pop{animation:pop .45s cubic-bezier(.2,1.6,.4,1)}
+@keyframes pop{0%{transform:scale(1);color:#fff}40%{transform:scale(1.45);color:var(--gold)}100%{transform:scale(1)}}
+.rage{display:flex;align-items:center;gap:8px;margin:4px 0}
+#rage{display:inline-flex;gap:5px}
+#rage i{width:12px;height:12px;border-radius:50%;background:#3a1a1c;box-shadow:inset 0 1px 2px #000}
+#rage i.on{background:radial-gradient(circle at 35% 30%,#ffb199,#ff2a1a 60%,#8a0c08);box-shadow:0 0 8px #ff3a1a,0 0 2px #fff}
+#rage i.full{animation:pulse .6s ease-in-out infinite alternate}
+@keyframes pulse{to{box-shadow:0 0 16px #ff3a1a,0 0 4px #fff;transform:scale(1.15)}}
+#stun{font-size:11px;font-weight:700;color:#ffd166;letter-spacing:.08em}
+.queue{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.queue b,.queue span{color:#fff}
+.env{color:#ff9f8a!important}
+#tell{min-height:1.4em;margin-top:6px;color:#ffb39a;font-size:13px}
+#tell em{color:#fff;font-style:normal;text-transform:uppercase;letter-spacing:.1em;background:#7a1424;padding:1px 6px;border-radius:4px}
+.row{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.toggles label{font-size:11px;letter-spacing:.04em;text-transform:none;color:var(--ink)}
+#fps{margin-left:auto;font-size:10px;color:#7d6f62}
+kbd{font:600 10px monospace;background:#2c2430;border:1px solid #5a4a3a;border-bottom-width:2px;border-radius:4px;padding:0 4px;color:#f3e6cc}
+details{margin-top:8px;font-size:12px;color:#cdbfa8}summary{cursor:pointer;color:var(--gold)}
+button,select{background:linear-gradient(#3a2f3e,#241c28);color:var(--ink);border:1px solid #6b5536;border-radius:8px;padding:4px 10px;font:inherit;cursor:pointer}
+button:hover{border-color:var(--gold)}
+#caption{position:fixed;bottom:64px;left:50%;transform:translate(-50%,10px);background:var(--panel);backdrop-filter:blur(8px);border:1px solid rgba(226,178,90,.4);padding:12px 22px 14px;border-radius:14px;font:italic 21px Georgia,serif;color:var(--ink);max-width:68%;text-align:center;opacity:0;transition:opacity .3s,transform .3s;z-index:2;box-shadow:0 8px 30px #0009}
+#caption .who{display:block;font:700 9px "Avenir Next",system-ui;letter-spacing:.3em;color:#b8314a;margin-bottom:3px;font-style:normal}
+#caption.on{opacity:1;transform:translate(-50%,0)}
+#banner{position:fixed;top:36%;width:100%;text-align:center;font:700 54px Georgia,serif;letter-spacing:.12em;color:var(--gold);text-shadow:0 4px 24px #000,0 0 30px rgba(226,178,90,.4);pointer-events:none;z-index:2;opacity:0;transform:scale(.8);transition:all .4s cubic-bezier(.2,1.4,.4,1)}
+#banner.show{opacity:1;transform:scale(1)}
+#banner small{display:block;font:500 16px "Avenir Next",system-ui;letter-spacing:.2em;color:var(--ink);margin-top:8px}
+#ARButton{z-index:3}

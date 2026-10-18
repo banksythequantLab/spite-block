@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Spite Block</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/src/style.css"></head>
+<body>
+<div id="hud">
+  <div class="title">SPITE<span>BLOCK</span></div>
+  <div class="stats">
+    <div><label>Score</label><b id="score">0</b></div>
+    <div><label>Best</label><b id="best">0</b></div>
+    <div><label>Layers</label><b id="layers">0</b></div>
+  </div>
+  <div class="rage"><label>Rage</label><span id="rage"></span><span id="stun"></span></div>
+  <div class="queue"><label>Bank</label><b id="hold">—</b><label>Next</label><span id="next"></span></div>
+  <div id="tell"></div>
+  <div class="row">
+    <select id="diff"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="spiteful">Spiteful</option></select>
+    <select id="quality" title="Graphics quality"><option value="high">High</option><option value="low">Low (Quest)</option></select>
+    <button id="new">New run <kbd>N</kbd></button>
+  </div>
+  <div class="row toggles">
+    <label><input type="checkbox" id="daily"> Daily</label>
+    <label><input type="checkbox" id="voice" checked> Voice</label>
+    <label><input type="checkbox" id="music" checked> Music <kbd>M</kbd></label>
+    <label><input type="checkbox" id="sfx" checked> SFX</label>
+    <span id="fps"></span>
+  </div>
+  <details><summary>Controls</summary>
+  <p><kbd>←↑↓→</kbd>/<kbd>WASD</kbd> move · <kbd>Q</kbd><kbd>E</kbd> <kbd>R</kbd><kbd>F</kbd> <kbd>T</kbd><kbd>G</kbd> rotate · <kbd>Space</kbd> slam · <kbd>Shift</kbd> soft drop · <kbd>C</kbd> bank · <kbd>V</kbd> call bluff · <kbd>B</kbd> fire rage · <kbd>P</kbd> pause · drag to orbit</p>
+  <p>Quest: Enter AR → pinch to grab, roll wrist to turn, palm-swipe down to slam, pinch the brass bank, poke the envelope, flick the red cube at the Dealer.</p></details>
+</div>
+<div id="caption"></div>
+<div id="banner"></div>
+<script type="module" src="/src/main.js"></script>
+</body></html>
