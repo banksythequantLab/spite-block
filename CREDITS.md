@@ -8,3 +8,6 @@
 | Cinzel font | public/fonts/Cinzel.ttf | Google Fonts / Natanael Gama | SIL OFL 1.1 (public/fonts/OFL.txt) |
 
 Card text and suits are drawn in code.
+
+## Dealer character (croupier)
+- `public/models/croupier.glb`: original project asset. Concept image generated with Qwen-Image, converted to 3D with TRELLIS.2 (image-to-3D), both run on the project owner's own ComfyUI server. Optimized with glTF-Transform (meshopt simplify, WebP textures). No third-party model used.
