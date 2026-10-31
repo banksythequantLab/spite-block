@@ -94,7 +94,7 @@ export class Game {
   lock() {
     const c=this.cur;
     if (overflow(c.cells, c.y)) { this.gameOver(); return; }
-    this.emit('lock', { name: c.name, cells: c.cells.map(([x,y,z])=>[x+c.x,y+c.y,z+c.z]) });
+    this.emit('lock', { name: c.name, ai: !!c.ai, cells: c.cells.map(([x,y,z])=>[x+c.x,y+c.y,z+c.z]) });
     const r = place(this.board, c.cells, c.x, c.y, c.z);
     let cleared = r.cleared; this.board = r.board;
     // Partial pressure: >=80% full for 3 consecutive drops cracks

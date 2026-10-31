@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
@@ -14,6 +15,7 @@ import { Audio } from './audio.js';
 import { HandInput } from './hands.js';
 import { Dealer } from './dealer.js';
 import { FX, Trail } from './fx.js';
+import { FAMILY_COLOR, lacquer, spiteMat, rimMat, halo, makeCard, suitBadgeTex, textSprite } from './casino.js';
 
 const S = 0.04;
 const $ = id => document.getElementById(id);
@@ -64,7 +66,8 @@ catcher.rotation.x = -Math.PI/2; catcher.position.y = 0.003; catcher.receiveShad
 // pedestal + legs (the tank floats on a brass stand)
 const brassM = new THREE.MeshPhysicalMaterial({ color: 0xc89b45, metalness: 1, roughness: 0.28, clearcoat: 0.4 });
 const base = new THREE.Mesh(new RoundedBoxGeometry(W*S+0.04, 0.02, D*S+0.04, 3, 0.006), brassM); base.position.set(0, 0.24, 0); base.castShadow = true; root.add(base);
-[[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([a,b]) => { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.01, 0.23, 12), brassM); leg.position.set(a*(W*S/2+0.01), 0.115, b*(D*S/2+0.01)); leg.castShadow = true; root.add(leg); });
+{ const legs = [[-1,-1],[1,-1],[-1,1],[1,1]].map(([a,b]) => new THREE.CylinderGeometry(0.006, 0.01, 0.23, 12).translate(a*(W*S/2+0.01), 0.115, b*(D*S/2+0.01)));
+  const legM = new THREE.Mesh(mergeGeometries(legs), brassM); legM.castShadow = true; root.add(legM); } // 4 legs -> 1 draw
 const floorPlate = new THREE.Mesh(new THREE.BoxGeometry(W*S, 0.004, D*S), new THREE.MeshPhysicalMaterial({ color: 0x1b1720, roughness: 0.35, metalness: 0.3, clearcoat: 1 }));
 floorPlate.position.set(W*S/2, -0.002, D*S/2); floorPlate.receiveShadow = true; tank.add(floorPlate);
 
@@ -74,9 +77,10 @@ const glassLow = new THREE.MeshPhysicalMaterial({ color: 0xcfe9f2, roughness: 0.
 const panes = []; const paneGeo = new THREE.PlaneGeometry(W*S, H*S);
 [[W*S/2, D*S, 0], [W*S/2, 0, Math.PI], [0, D*S/2, -Math.PI/2], [W*S, D*S/2, Math.PI/2]].forEach(([x,z,r]) => { const p = new THREE.Mesh(paneGeo, glassLow); p.position.set(x, H*S/2, z); p.rotation.y = r; p.renderOrder = 2; tank.add(p); panes.push(p); });
 // brass trim: 4 vertical posts + top & bottom frames
-const trimGeo = new THREE.BoxGeometry(0.005, H*S + 0.006, 0.005);
-[[0,0],[W*S,0],[0,D*S],[W*S,D*S]].forEach(([x,z]) => { const t = new THREE.Mesh(trimGeo, brassM); t.position.set(x, H*S/2, z); tank.add(t); });
-[0, H*S].forEach(y => { [[W*S/2,0,W*S,0.005],[W*S/2,D*S,W*S,0.005],[0,D*S/2,0.005,D*S],[W*S,D*S/2,0.005,D*S]].forEach(([x,z,w,d]) => { const t = new THREE.Mesh(new THREE.BoxGeometry(w+0.005, 0.006, d+0.005), brassM); t.position.set(x, y, z); tank.add(t); }); });
+{ const parts = [];
+  [[0,0],[W*S,0],[0,D*S],[W*S,D*S]].forEach(([x,z]) => parts.push(new THREE.BoxGeometry(0.005, H*S + 0.006, 0.005).translate(x, H*S/2, z)));
+  [0, H*S].forEach(y => { [[W*S/2,0,W*S,0.005],[W*S/2,D*S,W*S,0.005],[0,D*S/2,0.005,D*S],[W*S,D*S/2,0.005,D*S]].forEach(([x,z,w,d]) => parts.push(new THREE.BoxGeometry(w+0.005, 0.006, d+0.005).translate(x, y, z))); });
+  tank.add(new THREE.Mesh(mergeGeometries(parts), brassM)); } // 12 trims -> 1 draw
 // subtle etched grid on floor + height ticks
 const grid = new THREE.GridHelper(W*S, W, 0xd9a646, 0xd9a646); grid.material.transparent = true; grid.material.opacity = 0.18; grid.position.set(W*S/2, 0.001, D*S/2); tank.add(grid);
 const danger = new THREE.Mesh(new THREE.PlaneGeometry(W*S, D*S), new THREE.MeshBasicMaterial({ color: 0xff3020, transparent: true, opacity: 0.0, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
@@ -85,17 +89,16 @@ const clearFlash = new THREE.Mesh(new THREE.BoxGeometry(W*S, S, D*S), new THREE.
 clearFlash.visible = false; tank.add(clearFlash);
 
 // ---------- block materials by family ----------
+// Velvet Casino Noir: jewel-lacquer "chips" (MeshStandard + procedural chip texture; cheaper than Physical clearcoat)
 const MATS = {
-  glass: new THREE.MeshPhysicalMaterial({ color: 0xbfe6ee, roughness: 0.08, transmission: 0.0, transparent: true, opacity: 0.72, ior: 1.5, clearcoat: 1, envMapIntensity: 1.6, specularIntensity: 1 }),
-  cork: new THREE.MeshPhysicalMaterial({ color: 0xb5895a, roughness: 0.85, sheen: 0.6, sheenColor: new THREE.Color(0xffd9a8), sheenRoughness: 0.8 }),
-  brass: new THREE.MeshPhysicalMaterial({ color: 0xd2a650, metalness: 1, roughness: 0.22, clearcoat: 0.3 }),
-  enamel: new THREE.MeshPhysicalMaterial({ color: 0x1f6f80, roughness: 0.18, clearcoat: 1, clearcoatRoughness: 0.05 }),
-  obsidian: new THREE.MeshPhysicalMaterial({ color: 0x2a0f22, roughness: 0.06, metalness: 0.2, clearcoat: 1, emissive: 0x5a0018, emissiveIntensity: 0.6, iridescence: 0.6 }),
+  glass: lacquer(FAMILY_COLOR.glass), cork: lacquer(FAMILY_COLOR.cork), enamel: lacquer(FAMILY_COLOR.enamel),
+  brass: lacquer(FAMILY_COLOR.brass, { metalness: 0.55, roughness: 0.25 }),
+  obsidian: spiteMat,
 };
-const settledMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.35, clearcoat: 0.8, clearcoatRoughness: 0.2, metalness: 0.1 });
-const cubeGeo = new RoundedBoxGeometry(S*0.94, S*0.94, S*0.94, 3, S*0.2);
+const settledMat = lacquer(0xffffff, { roughness: 0.3 });
+const cubeGeo = new RoundedBoxGeometry(S*0.94, S*0.94, S*0.94, 2, S*0.16); // 300 tris/cube (was 588)
 const settled = new THREE.InstancedMesh(cubeGeo, settledMat, W*D*H); settled.count = 0; settled.frustumCulled = false; settled.castShadow = true; settled.receiveShadow = true; tank.add(settled);
-const SETTLED_TINT = { glass: 0xa9cdd6, cork: 0xa47a4e, brass: 0xb8913f, enamel: 0x2a6474, obsidian: 0x4a1a36 };
+const SETTLED_TINT = { ...FAMILY_COLOR, obsidian: 0x2a0a12, spite: 0x24090f };
 const cellFamily = new Array(W*D*H).fill(null);
 
 // current piece instanced (1 draw call), ghost fresnel
@@ -104,6 +107,16 @@ const ghostMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false
   vertexShader: `varying vec3 vN; varying vec3 vV; void main(){ vec4 mv = modelViewMatrix * instanceMatrix * vec4(position,1.); vN = normalize(normalMatrix * mat3(instanceMatrix) * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`,
   fragmentShader: `uniform vec3 uColor; uniform float uTime; varying vec3 vN; varying vec3 vV; void main(){ float f = pow(1. - abs(dot(vN, vV)), 2.2); gl_FragColor = vec4(uColor * (0.08 + 0.9*f) * (0.85+0.15*sin(uTime*4.)), 1.); }` });
 const ghostMesh = new THREE.InstancedMesh(cubeGeo, ghostMat, 5); ghostMesh.frustumCulled = false; tank.add(ghostMesh);
+// sabotage identity: red inverted-hull rim + suit badge + additive halo (fake glow, no post)
+const rimMesh = new THREE.InstancedMesh(cubeGeo, rimMat, 5); rimMesh.frustumCulled = false; rimMesh.visible = false; tank.add(rimMesh);
+const suitBadge = new THREE.Sprite(new THREE.SpriteMaterial({ map: suitBadgeTex, transparent: true, depthWrite: false })); suitBadge.scale.setScalar(0.035); suitBadge.visible = false; tank.add(suitBadge);
+const spiteHalo = halo(0xff2030, 0.22); spiteHalo.visible = false; spiteHalo.material.opacity = 0.55; tank.add(spiteHalo);
+// lock pop overlay (squash + additive flash on the just-locked cells)
+const popMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+const popMesh = new THREE.InstancedMesh(cubeGeo, popMat, 5); popMesh.frustumCulled = false; popMesh.visible = false; tank.add(popMesh);
+let pop = null;
+const scorePops = [0,1,2].map(() => { const t = textSprite(); root.add(t); return { s: t, age: 9 }; });
+let combo = 0, hitStop = 0; const COMBO_COL = [0xffe6a0, 0xffb347, 0xff4a5a, 0xd06bff];
 const m4 = new THREE.Matrix4();
 function setInst(mesh, cells, ox, oy, oz, scale = 1) { cells.forEach(([x,y,z], i) => { m4.makeScale(scale,scale,scale).setPosition((x+ox+0.5)*S, (y+oy+0.5)*S, (z+oz+0.5)*S); mesh.setMatrixAt(i, m4); }); mesh.count = cells.length; mesh.instanceMatrix.needsUpdate = true; }
 function miniPiece(name, scale = 0.55) { const cells = orientations(name)[0]; const m = new THREE.InstancedMesh(cubeGeo, MATS[MATERIAL[name]], cells.length); setInst(m, cells, 0, 0, 0, scale); m.children = []; m.scale.setScalar(scale); m.castShadow = true;
@@ -125,12 +138,11 @@ const envCanvas = document.createElement('canvas'); envCanvas.width = 256; envCa
   c.beginPath(); c.moveTo(4,4); c.lineTo(128,98); c.lineTo(252,4); c.stroke(); c.fillStyle = '#7a1424'; c.beginPath(); c.arc(128,98,26,0,7); c.fill(); c.fillStyle = '#f2d48a'; c.font = 'bold 36px Georgia'; c.textAlign = 'center'; c.fillText('?', 128, 111); }
 const envTex = new THREE.CanvasTexture(envCanvas); envTex.colorSpace = THREE.SRGBColorSpace;
 const envelope = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.06, 0.004), new THREE.MeshPhysicalMaterial({ map: envTex, roughness: 0.7, sheen: 0.5 })); envelope.castShadow = true; root.add(envelope); envelope.visible = false;
-const revealEnv = envelope.clone(); revealEnv.material = envelope.material.clone(); revealEnv.material.transparent = true; revealEnv.visible = false; root.add(revealEnv);
 const rageCube = new THREE.Mesh(new RoundedBoxGeometry(0.045, 0.045, 0.045, 3, 0.01), new THREE.MeshPhysicalMaterial({ color: 0xe0242c, emissive: 0xff2010, emissiveIntensity: 0.8, roughness: 0.2, clearcoat: 1 }));
 const rageHome = new THREE.Vector3(W*S/2 + 0.1, 0.28, 0.12); rageCube.position.copy(rageHome); rageCube.visible = false; root.add(rageCube);
-const rageLight = new THREE.PointLight(0xff3020, 0, 0.3); rageCube.add(rageLight);
-const pipMat = () => new THREE.MeshBasicMaterial({ color: 0x3a1818 });
-const ragePips = []; for (let i=0;i<RAGE_MAX;i++){ const p=new THREE.Mesh(new THREE.SphereGeometry(0.007,12,8), pipMat()); p.position.set(-W*S/2 + i*(W*S/(RAGE_MAX-1)), 0.255, D*S/2+0.035); root.add(p); ragePips.push(p); }
+const rageLight = new THREE.PointLight(0xff3020, 0, 0.3); rageCube.add(rageLight); const rageHalo = halo(0xff3020, 0.16); rageHalo.material.opacity = 0.7; rageCube.add(rageHalo);
+const pipC = new THREE.Color();
+const ragePips = new THREE.InstancedMesh(new THREE.SphereGeometry(0.007,12,8), new THREE.MeshBasicMaterial({ color: 0xffffff }), RAGE_MAX); root.add(ragePips); // 1 draw
 const fx = new FX(root); const trail = new Trail(root);
 function labelSprite(text, color) { const c = document.createElement('canvas'); c.width = 256; c.height = 64; const x = c.getContext('2d'); x.fillStyle = '#' + color.toString(16).padStart(6,'0'); x.font = '600 34px Georgia'; x.textAlign = 'center'; x.fillText(text, 128, 44);
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false })); s.scale.set(0.08, 0.02, 1); return s; }
@@ -196,8 +208,13 @@ function shiftFamilies(rows) { const out = new Array(W*D*H).fill(null); let dst 
 let curName = null;
 function refreshPiece() {
   const c = game.cur; if (!c) return;
-  if (c.name !== curName) { curMesh.material = MATS[MATERIAL[c.name]]; curName = c.name; }
+  const key = c.name + (c.ai ? '*' : '');
+  if (key !== curName) { curMesh.material = c.ai ? spiteMat : MATS[MATERIAL[c.name]]; curName = key; }
   setInst(curMesh, c.cells, c.x, c.y, c.z);
+  const evil = !!c.ai || MATERIAL[c.name] === 'obsidian'; rimMesh.visible = suitBadge.visible = spiteHalo.visible = evil;
+  if (evil) { setInst(rimMesh, c.cells, c.x, c.y, c.z, 1.12);
+    const cx = c.cells.reduce((a,v)=>a+v[0],0)/c.cells.length, cz = c.cells.reduce((a,v)=>a+v[2],0)/c.cells.length, top = Math.max(...c.cells.map(v=>v[1]));
+    suitBadge.position.set((c.x+cx+0.5)*S, (c.y+top+1.6)*S, (c.z+cz+0.5)*S); spiteHalo.position.set((c.x+cx+0.5)*S, (c.y+0.5)*S, (c.z+cz+0.5)*S); }
   const gy = game.ghostY(); setInst(ghostMesh, c.cells, c.x, gy ?? c.y, c.z, 1.02); ghostMesh.visible = gy !== null && gy !== c.y;
 }
 let sideKey = '', lastScore = 0, lastRage = 0;
@@ -228,15 +245,27 @@ let exprUntil = 0, shake = 0, dirtySettled = false, lastBoard = null;
 function express(e, secs = 2) { dealer.setExpression(e); exprUntil = performance.now() + secs*1000; }
 function tankCellWorld(x, y, z) { return new THREE.Vector3((x+0.5)*S, (y+0.5)*S, (z+0.5)*S).add(tank.position); }
 function handleEvents() {
+  let sawLock = false, sawClear = false;
   for (const e of game.drainEvents()) {
     switch (e.type) {
-      case 'lock': e.cells.forEach(([x,y,z]) => { if (y < H) cellFamily[idx(x,y,z)] = MATERIAL[e.name]; }); dirtySettled = true; break;
-      case 'aiPick': voice.say(pick('aiPick')); audio.play('envelope'); express('smirk', 2.5); revealEnvelope(); break;
-      case 'mercy': voice.say("I'll let you live. For now."); audio.play('envelope'); revealEnvelope(); break;
+      case 'lock': { sawLock = true; const fam = e.ai ? 'spite' : MATERIAL[e.name]; e.cells.forEach(([x,y,z]) => { if (y < H) cellFamily[idx(x,y,z)] = fam; }); dirtySettled = true;
+        const live = e.cells.filter(([,y]) => y < H); setInst(popMesh, live, 0, 0, 0); popMat.color.set(SETTLED_TINT[fam]).lerp(new THREE.Color(0xffffff), 0.5); pop = { cells: live, t: 0 }; popMesh.visible = true;
+        const lo = live.reduce((a,v)=>v[1]<a[1]?v:a, live[0] || [2,0,2]); fx.burst(tankCellWorld(lo[0], lo[1]-0.45, lo[2]), { n: 8, color: 0xd8c8b0, kind: 'spark', speed: 0.25, spread: [S*2, 0.002, S*2], life: 0.35 }); audio.play('chip'); break; }
+      case 'aiPick': voice.say(pick('aiPick')); audio.play('envelope'); express('smirk', 2.5); revealEnvelope(true); break;
+      case 'mercy': voice.say("I'll let you live. For now."); audio.play('envelope'); revealEnvelope(false); break;
       case 'clear': {
-        if (Math.random()<0.7) voice.say(pick('playerClear')); audio.play('clear', e.cleared); express('flustered', 1.6);
-        (e.rows||[0]).forEach((row, k) => { const p = tankCellWorld(2, row, 2); fx.burst(p, { n: 45, color: 0xf0d090, speed: 0.7, spread: [W*S, S, D*S] }); fx.burst(p, { n: 30, color: 0xffe6a0, speed: 1.0, spread: [W*S, S, D*S], kind: 'spark', life: 0.7 });
+        sawClear = true; combo++; const lvl = Math.min(3, combo - 1 + (e.cleared - 1)), cc = COMBO_COL[lvl];
+        if (Math.random()<0.7) voice.say(pick('playerClear')); audio.play('clear', e.cleared + combo - 1); audio.play('coins', e.cleared + lvl); express('flustered', 1.6);
+        hitStop = 0.06 + 0.025*lvl; shake = Math.max(shake, 0.004 + 0.003*lvl);
+        (e.rows||[0]).forEach((row, k) => { const p = tankCellWorld(2, row, 2);
+          const cols = []; for (let i=0;i<W*D;i++) { const f = cellFamily[row*W*D+i]; if (f) cols.push(SETTLED_TINT[f]); } if (!cols.length) cols.push(0xf0d090);
+          fx.burst(p, { n: 30 + 8*lvl, colors: cols, speed: 0.7 + 0.15*lvl, spread: [W*S, S, D*S] });
+          fx.burst(p, { n: 20 + 8*lvl, color: cc, speed: 1.0 + 0.2*lvl, spread: [W*S, S, D*S], kind: 'spark', life: 0.7 });
+          fx.burst(p, { n: 6 + 3*lvl, color: 0xffd36a, speed: 0.8, spread: [W*S*0.6, S, D*S*0.6], kind: 'coin', life: 1.2 });
+          fx.ring(p, { color: cc, size: 0.22 + 0.06*lvl });
           clearFlash.position.set(W*S/2, (row+0.5)*S, D*S/2); });
+        { const sp = scorePops.reduce((a,b)=>b.age>a.age?b:a); sp.s.userData.set(`+${e.pts.toLocaleString()}${combo>1?`  ×${combo}`:''}`, '#' + new THREE.Color(cc).getHexString()); sp.age = 0; sp.s.visible = true;
+          sp.s.position.copy(tankCellWorld(2, (e.rows||[0])[0], 2)).add(new THREE.Vector3(0, 0.05, D*S/2 + 0.04)); sp.y0 = sp.s.position.y; }
         shiftFamilies(e.rows||[]); fx.flash(clearFlash); flash(0xfff0b0); break; }
       case 'spiteClear': voice.say(pick('spiteClear'), true); express('flustered', 3); break;
       case 'nearDeath': voice.say(pick('nearDeath')); express('smirk', 2); break;
@@ -255,10 +284,23 @@ function handleEvents() {
       case 'crack': audio.play('clear', 1); break;
     }
   }
+  if (sawLock && !sawClear) combo = 0;
 }
 let flashT = 0; const trimBase = new THREE.Color(0xc89b45);
 function flash(c){ brassM.emissive.set(c); brassM.emissiveIntensity = 1.2; flashT = 0.4; }
-function revealEnvelope() { if (!envelope.visible && !envelope.userData.lastPos) return; revealEnv.position.copy(envelope.userData.lastPos || envelope.position); revealEnv.userData.t = 0; revealEnv.visible = true; }
+// Dealer card-flick reveal: card leaves his right glove, spins over the tank, flips to SPITE, bursts into the piece.
+const card = makeCard(); card.visible = false; root.add(card); const cardHalo = halo(0xff2a3a, 0.12); cardHalo.material.opacity = 0; card.add(cardHalo);
+let cardAnim = null;
+function revealEnvelope(evil = true) { dealer.flick(); const from = dealerHome.clone().add(new THREE.Vector3(0.13, -0.07, 0.06));
+  cardAnim = { t: 0, from, to: new THREE.Vector3(0, 0.25+H*S+0.06, 0.02), evil }; card.visible = true; }
+function updateCard(dt) { if (!cardAnim) return; const a = cardAnim; a.t += dt; const FLY = 0.45, HOLD = 0.3;
+  const k = Math.min(1, a.t/FLY), e = 1 - Math.pow(1-k, 3);
+  card.position.lerpVectors(a.from, a.to, e); card.position.y += Math.sin(k*Math.PI)*0.06;
+  tmpV.copy(viewer); root.worldToLocal(tmpV); card.lookAt(tmpV); card.rotateY((1-e)*Math.PI*5); card.scale.setScalar(0.8 + 0.4*e);
+  cardHalo.material.opacity = a.evil ? 0.8*e : 0;
+  if (a.t > FLY + HOLD) { card.visible = false; cardAnim = null; const c = a.evil ? 0xff2a3a : 0x80ff9a;
+    fx.burst(a.to, { n: 30, color: c, kind: 'spark', speed: 0.6, spread: [0.04,0.05,0.01], life: 0.6 }); fx.burst(a.to, { n: 10, color: a.evil ? 0x16080d : 0xf6efe1, speed: 0.4, spread: [0.04,0.05,0.01], life: 0.6 });
+    fx.ring(a.to, { color: c, size: 0.16, life: 0.4 }); if (a.evil) { audio.play('sting'); flash(0xff2030); } } }
 
 // wrap actions with feedback
 const act = {
@@ -287,12 +329,12 @@ const handInput = new HandInput(renderer, scene, { root, tank, S, pocket, envelo
   moveTo: (x,z) => { if (game.moveTo(x,z)) audio.play('move'); }, rot: act.rot, slam: act.slam, hold: act.hold, veto: act.veto, rage: act.rage } });
 document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hand-tracking'], optionalFeatures: ['local-floor'] }));
 renderer.xr.addEventListener('sessionstart', () => {
-  audio.ensure(); scene.background = null; scene.fog = null; deskGroup.visible = false; $('hud').style.display='none';
+  audio.ensure(); panes.forEach(p => p.material = glassLow); renderer.shadowMap.enabled = false; scene.background = null; scene.fog = null; deskGroup.visible = false; $('hud').style.display='none';
   setTimeout(() => { const cam = renderer.xr.getCamera(); const p = new THREE.Vector3(); cam.getWorldPosition(p);
     const f = new THREE.Vector3(0,0,-1).applyQuaternion(cam.quaternion); f.y = 0; f.normalize();
     root.position.copy(p).addScaledVector(f, 0.45); root.position.y = p.y - 0.4 - 0.25 - H*S/2; root.rotation.y = Math.atan2(-f.x, -f.z); rootBase.copy(root.position); }, 300);
 });
-renderer.xr.addEventListener('sessionend', () => { scene.background = desktopBg; scene.fog = new THREE.Fog(0x15111a, 1.4, 3.5); deskGroup.visible = true; $('hud').style.display=''; });
+renderer.xr.addEventListener('sessionend', () => { scene.background = desktopBg; scene.fog = new THREE.Fog(0x15111a, 1.4, 3.5); deskGroup.visible = true; $('hud').style.display=''; applyQuality(); });
 
 // ---------- loop ----------
 const clock = new THREE.Clock(); let tAccum = 0, frames = 0, fpsT = 0; const rootBase = root.position.clone();
@@ -301,7 +343,7 @@ renderer.setAnimationLoop(() => {
   const dt = Math.min(0.1, clock.getDelta()); tAccum += dt; frames++; fpsT += dt; if (fpsT > 1) { $('fps').textContent = `${Math.round(frames/fpsT)} fps`; frames = 0; fpsT = 0; }
   if (game && !paused) {
     handInput.update(dt);
-    game.update(dt*1000);
+    if (hitStop > 0) hitStop -= dt; else game.update(dt*1000);
     handleEvents(); if (dirtySettled || game.board !== lastBoard) { rebuildSettled(); if (dirtySettled) audio.play('lock'); dirtySettled = false; lastBoard = game.board; }
     refreshPiece(); refreshSide();
   }
@@ -316,18 +358,24 @@ renderer.setAnimationLoop(() => {
   capPanel.lookAt(viewer);
   // held-piece rim glow (hands) / gentle pulse (desktop)
   const held = handInput.hands.some(h => h.grab?.kind === 'piece'); const em = curMesh.material;
-  em.emissive?.setHex(held ? 0xffd890 : (MATERIAL[curName]==='obsidian' ? 0x5a0018 : 0x000000)); if (em.emissiveIntensity !== undefined) em.emissiveIntensity = held ? 0.35 + 0.15*Math.sin(tAccum*8) : 0.6;
+  if (em === spiteMat) { spiteMat.emissiveIntensity = (held ? 2.0 : 1.2) + 0.6*Math.sin(tAccum*5); rimMat.opacity = 0.55 + 0.3*Math.sin(tAccum*5); spiteHalo.material.opacity = 0.35 + 0.2*Math.sin(tAccum*5); suitBadge.position.y += Math.sin(tAccum*3)*0.0003; }
+  else { em.emissive.setHex(held ? 0xffd890 : 0x000000); em.emissiveIntensity = held ? 0.35 + 0.15*Math.sin(tAccum*8) : 0; }
+  // lock pop: squash then settle
+  if (pop) { pop.t += dt; const k = pop.t/0.22; if (k >= 1) { pop = null; popMesh.visible = false; } else { const b = Math.sin(k*Math.PI);
+    pop.cells.forEach(([x,y,z], i) => { m4.makeScale(1 + 0.14*b, 1 - 0.2*b, 1 + 0.14*b).setPosition((x+0.5)*S, (y+0.5 - 0.1*b)*S, (z+0.5)*S); popMesh.setMatrixAt(i, m4); }); popMesh.instanceMatrix.needsUpdate = true; popMat.opacity = 0.55*(1-k); } }
+  updateCard(dt);
+  scorePops.forEach(p => { if (!p.s.visible) return; p.age += dt; const k = p.age/1.1; if (k >= 1) { p.s.visible = false; return; } p.s.position.y = p.y0 + 0.07*(1 - Math.pow(1-k,2)); p.s.material.opacity = k < 0.7 ? 1 : (1-k)/0.3; p.s.scale.set(0.16, 0.04, 1).multiplyScalar(k < 0.12 ? 0.6 + 3.4*k : 1); });
   ghostMat.uniforms.uTime.value = tAccum;
   // envelope reveal: flip, rise, fade
   if (envelope.visible) envelope.userData.lastPos = envelope.position.clone();
   envelope.rotation.y = Math.sin(tAccum*2)*0.2; envelope.position.y += Math.sin(tAccum*3)*0.0002;
-  if (revealEnv.visible) { const t = (revealEnv.userData.t += dt); revealEnv.rotation.y = t*12; revealEnv.position.lerp(tmpV.set(0, 0.25+H*S+0.02, 0), dt*4); revealEnv.material.opacity = Math.max(0, 1 - t/0.7); revealEnv.scale.setScalar(1 + t);
-    if (t > 0.7) { revealEnv.visible = false; fx.burst(revealEnv.position, { n: 18, color: 0xc0283c, kind: 'spark', speed: 0.4, spread: [0.03,0.03,0.03], life: 0.5 }); } }
   // rage cube glow + trail
   rageCube.rotation.y += dt*2; rageLight.intensity = rageCube.visible ? 0.6 + 0.3*Math.sin(tAccum*6) : 0;
   if (rageCube.visible) { rageCube.material.emissiveIntensity = 0.6 + 0.4*Math.sin(tAccum*6); if (rageCube.position.distanceTo(rageHome) > 0.01 || handInput.hands.some(h=>h.grab?.kind==='rage')) trail.push(rageCube.position); }
   trail.update(dt);
-  ragePips.forEach((p,i) => { const on = game && i < game.rage; p.material.color.setHex(on ? 0xff3a2a : 0x3a1818); p.scale.setScalar(on ? 1.15 + (game.rage>=RAGE_MAX ? 0.25*Math.sin(tAccum*8+i) : 0) : 1); });
+  for (let i=0;i<RAGE_MAX;i++) { const on = game && i < game.rage; const sc = on ? 1.15 + (game.rage>=RAGE_MAX ? 0.25*Math.sin(tAccum*8+i) : 0) : 1;
+    m4.makeScale(sc,sc,sc).setPosition(-W*S/2 + i*(W*S/(RAGE_MAX-1)), 0.255, D*S/2+0.035); ragePips.setMatrixAt(i, m4); ragePips.setColorAt(i, pipC.setHex(on ? 0xff3a2a : 0x3a1818)); }
+  ragePips.instanceMatrix.needsUpdate = true; ragePips.instanceColor.needsUpdate = true;
   // shake (tank only, so it also works in AR) + flash decay
   if (shake > 0) { root.position.set(rootBase.x + (Math.random()-0.5)*shake, rootBase.y + (Math.random()-0.5)*shake, rootBase.z + (Math.random()-0.5)*shake); shake = Math.max(0, shake - dt*0.06); if (shake === 0) root.position.copy(rootBase); }
   if (flashT > 0) { flashT -= dt; brassM.emissiveIntensity = Math.max(0, flashT/0.4)*1.2; if (flashT <= 0) brassM.emissive.set(0); }
@@ -338,4 +386,4 @@ renderer.setAnimationLoop(() => {
 addEventListener('resize', () => { camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 
 newGame();
-window.__spite = { camera, controls, get game(){ return game; }, act, newGame, voice, dealer, express, audio, renderer };
+window.__spite = { fx, reveal: revealEnvelope, get combo(){ return combo; }, camera, controls, get game(){ return game; }, act, newGame, voice, dealer, express, audio, renderer };

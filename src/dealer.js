@@ -56,6 +56,8 @@ export class Dealer {
   }
   setExpression(e) { this.expr = e; }
   hitImpact() { this.hit = 1; }
+  /** card-flick: right glove snaps up and forward */
+  flick() { this.flickT = 1; }
   /** target: world position to look at (active piece); viewer: camera world pos; speak: mouth level 0..1 */
   update(dt, { target, viewer, speak = 0 }) {
     this.t += dt; const t = this.t, e = this.expr;
@@ -89,12 +91,13 @@ export class Dealer {
     this.lipTop.scale.y = 0.35 - this.smile*0.25; this.lipBot.scale.y = 0.2 + Math.max(0,this.smile)*0.6;
     this.mouthG.rotation.z = e === 'smirk' ? 0.2 : 0;
     // head motion
-    this.hit = Math.max(0, this.hit - dt*2);
+    this.hit = Math.max(0, this.hit - dt*2); this.flickT = Math.max(0, (this.flickT||0) - dt*2.5);
     this.tilt = damp(this.tilt, tilt, 6, dt);
     this.face.rotation.set(-this.hit*0.6*Math.sin(this.hit*20), Math.sin(t*0.7)*0.08, this.tilt + spin);
     this.face.position.z = -this.hit*0.03;
     this.hands.forEach((hd, i) => {
       hd.h.position.y = -0.07 + Math.sin(t*1.8 + i*1.3)*0.006 + handY; hd.h.rotation.z = Math.sin(t*1.2+i)*0.15;
+      if (hd.s > 0) { const f = Math.sin((1 - this.flickT) * Math.PI) * (this.flickT > 0 ? 1 : 0); hd.h.position.y += f*0.05; hd.h.position.z = 0.04 + f*0.05; hd.h.rotation.x = -f*1.2; }
       hd.fingers.forEach((f, j) => { f.rotation.y = drum ? Math.max(0, Math.sin(t*22 - j*0.9)) * 0.7 : 0.08; f.position.y = -0.002 - (drum ? Math.max(0, Math.sin(t*22 - j*0.9))*0.006 : 0); });
     });
     this.stars.visible = e === 'stunned';

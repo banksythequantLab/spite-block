@@ -44,6 +44,9 @@ export class Audio {
       case 'rageFire': this.noise({ t: 0.35, v: 0.4, freq: 300, f2: 4000 }); this.tone({ f: 900, f2: 200, type: 'square', t: 0.3, v: 0.08 }); break;
       case 'stun': this.tone({ f: 180, f2: 700, type: 'sine', t: 0.25, v: 0.35 }); this.tone({ f: 700, f2: 160, type: 'sine', t: 0.4, v: 0.3, at: 0.22 }); break;
       case 'envelope': this.noise({ t: 0.2, v: 0.12, freq: 3000, f2: 800 }); this.tone({ f: 330, f2: 247, type: 'triangle', t: 0.4, v: 0.1, at: 0.1 }); break;
+      case 'sting': this.noise({ t: 0.12, v: 0.25, freq: 5000, f2: 1500 }); this.tone({ f: 110, f2: 55, type: 'sawtooth', t: 0.5, v: 0.12, at: 0.08 }); [311.1, 440].forEach(f => this.tone({ f, type: 'square', t: 0.35, v: 0.05, at: 0.1 })); this.tone({ f: 1244, f2: 622, type: 'triangle', t: 0.25, v: 0.06, at: 0.12 }); break;
+      case 'chip': for (let i=0;i<2;i++) { this.noise({ t: 0.04, v: 0.18, freq: 3200 + Math.random()*1500, q: 6, at: i*0.035 }); } this.tone({ f: 190, f2: 110, type: 'sine', t: 0.07, v: 0.16 }); break;
+      case 'coins': for (let i=0;i<Math.min(10, 3+n*2);i++) this.tone({ f: 2600 + Math.random()*1800, type: 'triangle', t: 0.08, v: 0.035, at: 0.05 + i*0.035 + Math.random()*0.02 }); break;
       case 'gameOver': [392, 349.2, 329.6, 261.6].forEach((f,i)=>this.tone({ f, type: 'triangle', t: 0.55, v: 0.18, at: i*0.32 })); break;
     }
   }
