@@ -15,7 +15,7 @@ import { Audio } from './audio.js';
 import { HandInput } from './hands.js';
 import { Dealer } from './dealer.js';
 import { FX, Trail } from './fx.js';
-import { FAMILY_COLOR, lacquer, spiteMat, rimMat, halo, makeCard, suitBadgeTex, textSprite } from './casino.js';
+import { font, tex, FAMILY_COLOR, lacquer, spiteMat, rimMat, halo, makeCard, suitBadgeTex, textSprite } from './casino.js';
 
 const S = 0.04;
 const $ = id => document.getElementById(id);
@@ -45,12 +45,15 @@ const root = new THREE.Group(); root.position.set(0, 0.8, -0.1); scene.add(root)
 keyL.target = root;
 // desktop-only table + backdrop
 const deskGroup = new THREE.Group(); scene.add(deskGroup);
-const woodTex = (() => { const c = document.createElement('canvas'); c.width = 512; c.height = 512; const x = c.getContext('2d');
-  x.fillStyle = '#4a2f20'; x.fillRect(0,0,512,512); for (let i=0;i<140;i++){ x.strokeStyle = `rgba(${30+Math.random()*40},${15+Math.random()*20},10,${0.15+Math.random()*0.25})`; x.lineWidth = 1+Math.random()*3; x.beginPath(); const y=Math.random()*512; x.moveTo(0,y); x.bezierCurveTo(170,y+Math.random()*20-10,340,y+Math.random()*20-10,512,y); x.stroke(); }
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2,1); return t; })();
-const table = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.03, 0.8), new THREE.MeshPhysicalMaterial({ map: woodTex, roughness: 0.45, clearcoat: 0.6, clearcoatRoughness: 0.3 }));
+// CC0 ambientCG Wood066 (re-graded to mahogany) with normal + roughness maps
+const table = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.03, 0.8), new THREE.MeshPhysicalMaterial({ map: tex('wood.jpg', { rep: 1.5 }), normalMap: tex('wood_n.jpg', { srgb: false, rep: 1.5 }), roughnessMap: tex('wood_r.jpg', { srgb: false, rep: 1.5 }), roughness: 0.9, clearcoat: 0.7, clearcoatRoughness: 0.18 }));
 table.position.set(0, 0.785, -0.1); table.receiveShadow = true; deskGroup.add(table);
-const felt = new THREE.Mesh(new THREE.CircleGeometry(0.36, 48), new THREE.MeshStandardMaterial({ color: 0x1d4a3a, roughness: 1 }));
+// casino felt: CC0 ambientCG Fabric034 re-tinted, with its normal map; brass-railed rim
+const felt = new THREE.Mesh(new THREE.CircleGeometry(0.36, 64), new THREE.MeshStandardMaterial({ map: tex('felt.jpg', { rep: 3 }), normalMap: tex('felt_n.jpg', { srgb: false, rep: 3 }), normalScale: new THREE.Vector2(0.6, 0.6), roughness: 1 }));
+{ const railM = new THREE.MeshPhysicalMaterial({ color: 0x2a0d12, roughness: 0.35, clearcoat: 1, sheen: 0.5 }); const rail = new THREE.Mesh(new THREE.TorusGeometry(0.365, 0.014, 12, 72), railM); rail.rotation.x = -Math.PI/2; rail.position.set(0, 0.806, -0.1); deskGroup.add(rail);
+  // generated casino backdrop (ComfyUI): curved panel behind the table, unlit so it reads as a soft out-of-focus room
+  const bd = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 2.0, 32, 1, true, -Math.PI*0.36, Math.PI*0.72), new THREE.MeshBasicMaterial({ map: tex('backdrop.jpg'), side: THREE.BackSide, fog: false, color: 0xffffff }));
+  bd.rotation.y = Math.PI; bd.position.set(0, 1.35, 0.6); deskGroup.add(bd); }
 felt.rotation.x = -Math.PI/2; felt.position.set(0, 0.8015, -0.1); felt.receiveShadow = true; deskGroup.add(felt);
 
 // tank (well floor ~25 cm above table)
@@ -135,7 +138,7 @@ const previews = [0,1].map(i => { const g = new THREE.Group(); g.position.set(W*
 const nextLabel = labelSprite('NEXT', 0xd9a646); nextLabel.position.set(W*S/2 + 0.1, 0.25 + H*S - 0.02, 0); root.add(nextLabel);
 const envCanvas = document.createElement('canvas'); envCanvas.width = 256; envCanvas.height = 170;
 { const c = envCanvas.getContext('2d'); const g = c.createLinearGradient(0,0,0,170); g.addColorStop(0,'#efe1bd'); g.addColorStop(1,'#cdb98d'); c.fillStyle = g; c.fillRect(0,0,256,170); c.strokeStyle = '#8a7350'; c.lineWidth = 3;
-  c.beginPath(); c.moveTo(4,4); c.lineTo(128,98); c.lineTo(252,4); c.stroke(); c.fillStyle = '#7a1424'; c.beginPath(); c.arc(128,98,26,0,7); c.fill(); c.fillStyle = '#f2d48a'; c.font = 'bold 36px Georgia'; c.textAlign = 'center'; c.fillText('?', 128, 111); }
+  c.beginPath(); c.moveTo(4,4); c.lineTo(128,98); c.lineTo(252,4); c.stroke(); c.fillStyle = '#7a1424'; c.beginPath(); c.arc(128,98,26,0,7); c.fill(); c.fillStyle = '#f2d48a'; c.font = font(36, 900); c.textAlign = 'center'; c.fillText('?', 128, 111); }
 const envTex = new THREE.CanvasTexture(envCanvas); envTex.colorSpace = THREE.SRGBColorSpace;
 const envelope = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.06, 0.004), new THREE.MeshPhysicalMaterial({ map: envTex, roughness: 0.7, sheen: 0.5 })); envelope.castShadow = true; root.add(envelope); envelope.visible = false;
 const rageCube = new THREE.Mesh(new RoundedBoxGeometry(0.045, 0.045, 0.045, 3, 0.01), new THREE.MeshPhysicalMaterial({ color: 0xe0242c, emissive: 0xff2010, emissiveIntensity: 0.8, roughness: 0.2, clearcoat: 1 }));
@@ -144,8 +147,10 @@ const rageLight = new THREE.PointLight(0xff3020, 0, 0.3); rageCube.add(rageLight
 const pipC = new THREE.Color();
 const ragePips = new THREE.InstancedMesh(new THREE.SphereGeometry(0.007,12,8), new THREE.MeshBasicMaterial({ color: 0xffffff }), RAGE_MAX); root.add(ragePips); // 1 draw
 const fx = new FX(root); const trail = new Trail(root);
-function labelSprite(text, color) { const c = document.createElement('canvas'); c.width = 256; c.height = 64; const x = c.getContext('2d'); x.fillStyle = '#' + color.toString(16).padStart(6,'0'); x.font = '600 34px Georgia'; x.textAlign = 'center'; x.fillText(text, 128, 44);
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false })); s.scale.set(0.08, 0.02, 1); return s; }
+function labelSprite(text, color) { const c = document.createElement('canvas'); c.width = 512; c.height = 128; const x = c.getContext('2d'); x.textAlign = 'center'; x.font = font(70, 700);
+  x.shadowColor = 'rgba(0,0,0,0.8)'; x.shadowBlur = 8; x.fillStyle = '#' + color.toString(16).padStart(6,'0'); x.fillText(text, 256, 92);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false })); s.scale.set(0.08, 0.02, 1); return s; }
 
 // in-world caption panel (for AR)
 const capCanvas = document.createElement('canvas'); capCanvas.width = 1024; capCanvas.height = 256;
@@ -156,9 +161,9 @@ let panelDirty = true;
 function drawPanel() {
   const c = capCanvas.getContext('2d'); c.clearRect(0,0,1024,256);
   c.fillStyle = 'rgba(16,10,18,0.78)'; c.beginPath(); c.roundRect(4,4,1016,248,36); c.fill(); c.strokeStyle = '#c89b45'; c.lineWidth = 3; c.stroke();
-  c.fillStyle = '#e7b65c'; c.font = '600 42px Georgia'; c.textAlign = 'center';
+  c.fillStyle = '#e7b65c'; c.font = font(40, 700); c.textAlign = 'center';
   c.fillText(`${game.score.toLocaleString()}  ·  rage ${'◆'.repeat(game.rage)}${'◇'.repeat(RAGE_MAX-game.rage)}${game.stunned?'  ·  STUNNED':''}${game.over?'  ·  GAME OVER':''}`, 512, 66);
-  c.fillStyle = '#f4e3c1'; c.font = 'italic 38px Georgia';
+  c.fillStyle = '#f4e3c1'; c.font = font(34, 400);
   const words = (lastCaption||'').split(' '); let line='', y=138;
   for (const w of words) { if (c.measureText(line+w).width > 940) { c.fillText(line, 512, y); line=''; y+=48; } line += w+' '; }
   c.fillText(line, 512, y); capTex.needsUpdate = true; panelDirty = false;

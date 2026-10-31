@@ -1,5 +1,12 @@
 import * as THREE from 'three';
-// Velvet Casino Noir: procedural textures + materials (no image assets).
+// Velvet Casino Noir: generated-art textures (ComfyUI / CC0, see CREDITS.md) + materials.
+// Display font (Cinzel, OFL) is loaded before any in-world label is drawn.
+export const FONT = 'Cinzel';
+const BASE = import.meta.env.BASE_URL;
+try { const ff = new FontFace(FONT, `url(${BASE}fonts/Cinzel.ttf)`, { weight: '400 900' }); await Promise.race([ff.load().then(f => document.fonts.add(f)), new Promise(r => setTimeout(r, 2500))]); } catch (e) { /* fall back to serif */ }
+export const font = (px, w = 700) => `${w} ${px}px ${FONT}, Georgia, serif`;
+const loader = new THREE.TextureLoader();
+export const tex = (f, { srgb = true, rep = 0 } = {}) => { const t = loader.load(BASE + 'tex/' + f); if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; if (rep) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep, rep); } return t; };
 const canvas = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; };
 
 // Jewel-tone family colours (casino chips)
@@ -15,7 +22,14 @@ export const chipTex = canvas(256, 256, (x, w) => {
   x.strokeStyle = 'rgba(0,0,0,0.25)'; x.lineWidth = 2; x.beginPath(); x.arc(128, 128, 66, 0, 7); x.stroke();
   x.fillStyle = 'rgba(255,246,225,0.9)'; for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; x.save(); x.translate(128 + Math.cos(a) * 104, 128 + Math.sin(a) * 104); x.rotate(a); x.fillRect(-7, -14, 14, 28); x.restore(); }
 });
-export const lacquer = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, map: chipTex, roughness: 0.22, metalness: 0.05, envMapIntensity: 1.3, ...extra });
+export const chipArt = tex('chip.png');
+// RGB = lacquer shading (tinted by family/instance colour), A = gold inlay -> mixed to metallic gold in-shader.
+export const lacquer = (color, extra = {}) => { const m = new THREE.MeshStandardMaterial({ color, map: chipArt, roughness: 0.18, metalness: 0.05, envMapIntensity: 1.4, ...extra });
+  m.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader
+    .replace('#include <map_fragment>', '#include <map_fragment>\n float goldM = texture2D( map, vMapUv ).a; diffuseColor.rgb = mix( diffuseColor.rgb, vec3(0.95,0.68,0.26), goldM );')
+    .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n metalnessFactor = mix( metalnessFactor, 1.0, goldM );')
+    .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = mix( roughnessFactor, 0.3, goldM );'); };
+  m.customProgramCacheKey = () => 'lacquerGold'; m.transparent = false; return m; };
 
 // Red-vein emissive map for sabotage pieces
 export const veinTex = canvas(256, 256, (x, w) => {
@@ -25,7 +39,7 @@ export const veinTex = canvas(256, 256, (x, w) => {
   for (let i = 0; i < 5; i++) crack(Math.random() * w, Math.random() * w, Math.random() * 7, 26, 3.2);
   x.shadowBlur = 0; x.strokeStyle = '#ff5a3a'; x.lineWidth = 6; x.strokeRect(3, 3, w - 6, w - 6);
 });
-export const spiteMat = new THREE.MeshStandardMaterial({ color: 0x0c0608, roughness: 0.12, metalness: 0.3, envMapIntensity: 1.6, emissive: 0xff2020, emissiveMap: veinTex, emissiveIntensity: 1.4 });
+export const spiteMat = new THREE.MeshStandardMaterial({ map: tex('obsidian.jpg'), color: 0xffffff, roughness: 0.14, metalness: 0.35, envMapIntensity: 1.6, emissive: 0xff2a20, emissiveMap: tex('obsidian_em.jpg'), emissiveIntensity: 2.2 });
 // Inverted-hull rim outline (one instanced draw)
 export const rimMat = new THREE.MeshBasicMaterial({ color: 0xff2a2a, side: THREE.BackSide, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
 
@@ -35,9 +49,15 @@ export const halo = (color, size) => { const s = new THREE.Sprite(new THREE.Spri
 
 // Playing card (face: red spade + SPITE, back: crimson lattice)
 const suit = (x, cx, cy, r, col) => { x.fillStyle = col; x.beginPath(); x.moveTo(cx, cy - r); x.bezierCurveTo(cx + r * 1.3, cy - r * 0.1, cx + r * 0.9, cy + r * 0.9, cx, cy + r * 0.35); x.bezierCurveTo(cx - r * 0.9, cy + r * 0.9, cx - r * 1.3, cy - r * 0.1, cx, cy - r); x.fill(); x.beginPath(); x.moveTo(cx, cy + r * 0.2); x.lineTo(cx + r * 0.35, cy + r * 1.05); x.lineTo(cx - r * 0.35, cy + r * 1.05); x.fill(); };
-export const cardFaceTex = canvas(180, 256, (x, w, h) => { x.fillStyle = '#f6efe1'; x.beginPath(); x.roundRect(0, 0, w, h, 16); x.fill(); x.strokeStyle = '#b8902f'; x.lineWidth = 5; x.beginPath(); x.roundRect(8, 8, w - 16, h - 16, 10); x.stroke();
-  suit(x, 90, 110, 42, '#c0142c'); x.fillStyle = '#16080d'; x.font = 'bold 30px Georgia'; x.textAlign = 'center'; x.fillText('SPITE', 90, 222); x.fillStyle = '#c0142c'; x.font = 'bold 26px Georgia'; x.fillText('♠', 26, 40); });
-export const cardBackTex = canvas(180, 256, (x, w, h) => { x.fillStyle = '#5a0b1a'; x.beginPath(); x.roundRect(0, 0, w, h, 16); x.fill(); x.strokeStyle = 'rgba(226,178,90,0.55)'; x.lineWidth = 2; for (let i = -h; i < w + h; i += 16) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i + h, h); x.stroke(); x.beginPath(); x.moveTo(i, h); x.lineTo(i + h, 0); x.stroke(); } x.strokeStyle = '#e2b25a'; x.lineWidth = 6; x.beginPath(); x.roundRect(8, 8, w - 16, h - 16, 10); x.stroke(); });
+const imgCanvas = (w, h, src, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  const x = c.getContext('2d'); const paint = img => { x.clearRect(0, 0, w, h); x.save(); x.beginPath(); x.roundRect(0, 0, w, h, w*0.07); x.clip(); if (img) x.drawImage(img, 0, 0, w, h); draw(x, w, h); x.restore(); t.needsUpdate = true; };
+  paint(null); const im = new Image(); im.onload = () => paint(im); im.src = BASE + 'tex/' + src; return t; };
+// SPITE face: generated ivory/gold card frame + code-rendered suit and lettering (crisp, never garbled)
+export const cardFaceTex = imgCanvas(384, 512, 'cardface.jpg', (x, w, h) => {
+  suit(x, w/2, h*0.4, 74, '#b80f26'); x.textAlign = 'center'; x.fillStyle = '#1a0a0e'; x.font = font(64, 900); x.fillText('SPITE', w/2, h*0.83);
+  x.fillStyle = '#b80f26'; x.font = font(46, 900); x.fillText('S', 46, 74); suit(x, 46, 100, 14, '#b80f26');
+  x.save(); x.translate(w, h); x.rotate(Math.PI); x.fillText('S', 46, 74); suit(x, 46, 100, 14, '#b80f26'); x.restore(); });
+export const cardBackTex = imgCanvas(384, 512, 'cardback.jpg', () => {});
 export function makeCard() {
   const g = new THREE.Group(); const geo = new THREE.PlaneGeometry(0.063, 0.09);
   const f = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: cardFaceTex, transparent: true })); g.add(f);
@@ -51,6 +71,6 @@ export const suitBadgeTex = canvas(128, 128, (x) => { x.fillStyle = 'rgba(20,6,1
 export function textSprite() {
   const c = document.createElement('canvas'); c.width = 512; c.height = 128; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false })); s.scale.set(0.16, 0.04, 1); s.visible = false;
-  s.userData.set = (text, color) => { const x = c.getContext('2d'); x.clearRect(0, 0, 512, 128); x.font = 'bold 84px Georgia'; x.textAlign = 'center'; x.lineWidth = 10; x.strokeStyle = 'rgba(20,6,10,0.9)'; x.strokeText(text, 256, 96); x.fillStyle = color; x.fillText(text, 256, 96); t.needsUpdate = true; };
+  s.userData.set = (text, color) => { const x = c.getContext('2d'); x.clearRect(0, 0, 512, 128); x.font = font(84, 900); x.textAlign = 'center'; x.lineWidth = 10; x.strokeStyle = 'rgba(20,6,10,0.9)'; x.strokeText(text, 256, 96); x.fillStyle = color; x.fillText(text, 256, 96); t.needsUpdate = true; };
   return s;
 }
