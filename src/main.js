@@ -296,12 +296,12 @@ function flash(c){ brassM.emissive.set(c); brassM.emissiveIntensity = 1.2; flash
 // Dealer card-flick reveal: card leaves his right glove, spins over the tank, flips to SPITE, bursts into the piece.
 const card = makeCard(); card.visible = false; root.add(card); const cardHalo = halo(0xff2a3a, 0.12); cardHalo.material.opacity = 0; card.add(cardHalo);
 let cardAnim = null;
-function revealEnvelope(evil = true) { dealer.flick(); const from = dealerHome.clone().add(new THREE.Vector3(0.13, -0.07, 0.06));
-  cardAnim = { t: 0, from, to: new THREE.Vector3(0, 0.25+H*S+0.06, 0.02), evil }; card.visible = true; }
+function revealEnvelope(evil = true) { dealer.flick(); cardAnim = { t: 0, from: new THREE.Vector3(), to: new THREE.Vector3(0, 0.25+H*S-0.03, 0.06), evil }; card.visible = true; updateCard(0); }
 function updateCard(dt) { if (!cardAnim) return; const a = cardAnim; a.t += dt; const FLY = 0.45, HOLD = 0.3;
   const k = Math.min(1, a.t/FLY), e = 1 - Math.pow(1-k, 3);
-  card.position.lerpVectors(a.from, a.to, e); card.position.y += Math.sin(k*Math.PI)*0.06;
-  tmpV.copy(viewer); root.worldToLocal(tmpV); card.lookAt(tmpV); card.rotateY((1-e)*Math.PI*5); card.scale.setScalar(0.8 + 0.4*e);
+  if (k < 0.2) root.worldToLocal(dealer.gloveTip(a.from)); // track the glove while it snaps
+  card.position.lerpVectors(a.from, a.to, e); card.position.y -= Math.sin(k*Math.PI)*0.03; // dips below the chin line, never up over the face
+  tmpV.copy(viewer); root.worldToLocal(tmpV); card.lookAt(tmpV); card.rotateY((1-e)*Math.PI*5); card.scale.setScalar(0.4 + 0.45*e);
   cardHalo.material.opacity = a.evil ? 0.8*e : 0;
   if (a.t > FLY + HOLD) { card.visible = false; cardAnim = null; const c = a.evil ? 0xff2a3a : 0x80ff9a;
     fx.burst(a.to, { n: 30, color: c, kind: 'spark', speed: 0.6, spread: [0.04,0.05,0.01], life: 0.6 }); fx.burst(a.to, { n: 10, color: a.evil ? 0x16080d : 0xf6efe1, speed: 0.4, spread: [0.04,0.05,0.01], life: 0.6 });

@@ -20,6 +20,19 @@ const col = (g, hex) => { const c = new THREE.Color(hex); const n = g.attributes
 const strip = g => { g = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(g.attributes)) if (!['position','normal','uv','color'].includes(k)) g.deleteAttribute(k); return g; };
 const xf = (g, { p = [0,0,0], r = [0,0,0], s = [1,1,1] } = {}) => g.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(...p), new THREE.Quaternion().setFromEuler(new THREE.Euler(...r)), new THREE.Vector3(...s)));
 
+// front projection of the clean Qwen concept (the image TRELLIS was built from) onto the face: crisp mask/mustache/skin
+const PROJ = new THREE.TextureLoader().load(import.meta.env.BASE_URL + 'tex/dealer_face_proj.webp'); PROJ.colorSpace = THREE.SRGBColorSpace; PROJ.anisotropy = 4;
+const PX = { s: 853, cx: 510, cy: 405, x0: 330, y0: 300, w: 370, h: 350 }; // concept px per model unit, eye-centre px, crop box
+const sstep = (a, b, v) => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t*t*(3 - 2*t); };
+function addProjection(g) {
+  const p = g.attributes.position, n = g.attributes.normal, out = new Float32Array(p.count * 3);
+  for (let i = 0; i < p.count; i++) {
+    const px = PX.cx + (p.getX(i) - CX) * PX.s, py = PX.cy - (p.getY(i) - EYE_Y) * PX.s;
+    const w = sstep(0.25, 0.6, n.getZ(i)) * sstep(345, 370, px) * sstep(675, 650, px) * sstep(318, 330, py) * sstep(640, 615, py) * (p.getZ(i) > 0.02 ? 1 : 0);
+    out.set([(px - PX.x0) / PX.w, 1 - (py - PX.y0) / PX.h, w], i*3);
+  }
+  g.setAttribute('proj', new THREE.BufferAttribute(out, 3));
+}
 /** smooth normals across UV seams: average face normals per welded position */
 function smoothNormals(g) {
   const p = g.attributes.position, idx = g.index.array, n = new Float32Array(p.count * 3), key = new Map(), id = new Int32Array(p.count);
@@ -58,17 +71,26 @@ export class Dealer {
       mat.side = THREE.FrontSide; mat.transparent = false; mat.opacity = 1; mat.depthWrite = true;
       mat.flatShading = false; mat.needsUpdate = true; mat.metalness = 0.55; mat.roughness = 1; // driven by metallicRoughness map (gold trim/mask shine, matte velvet)
       mat.envMapIntensity = 1.2;
+      addProjection(geo);
       const parts = split(geo);
+      const faceMat = mat.clone(); this.faceMat = faceMat;
+      faceMat.customProgramCacheKey = () => 'dealer-faceproj';
+      faceMat.onBeforeCompile = sh => { sh.uniforms.projMap = { value: PROJ };
+        sh.vertexShader = 'attribute vec3 proj; varying vec3 vProj;\n' + sh.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\n vProj = proj;');
+        sh.fragmentShader = 'uniform sampler2D projMap; varying vec3 vProj;\n' + sh.fragmentShader
+          .replace('#include <map_fragment>', '#include <map_fragment>\n vec4 pc = texture2D(projMap, vProj.xy); diffuseColor.rgb = mix(diffuseColor.rgb, pc.rgb, vProj.z);')
+          .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n metalnessFactor *= 1.0 - 0.6*vProj.z;')
+          .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = mix(roughnessFactor, 0.55, vProj.z);'); };
       // body: model -> dealer-local; head: relative to neck pivot; jaw: relative to jaw pivot (inside head)
       const M = new THREE.Matrix4().makeTranslation(-CX, -EYE_Y, 0).premultiply(new THREE.Matrix4().makeScale(K, K, K)).premultiply(new THREE.Matrix4().makeTranslation(0, 0.02, 0));
       const jp = toLocal(JAWP.x, JAWP.y, JAWP.z);
       const body = new THREE.Mesh(parts.body.applyMatrix4(M), mat);
-      const head = new THREE.Mesh(parts.head.applyMatrix4(M.clone().premultiply(new THREE.Matrix4().makeTranslation(-neck.x, -neck.y, -neck.z))), mat);
+      const head = new THREE.Mesh(parts.head.applyMatrix4(M.clone().premultiply(new THREE.Matrix4().makeTranslation(-neck.x, -neck.y, -neck.z))), faceMat);
       this.parts = { body, head };
       body.castShadow = head.castShadow = true;
       this.torso.add(body); this.face.add(head);
       this._jawSrc = { jaw: parts.jaw, M, jp, neck };
-      this.mat = mat;
+      this.mat = mat; this.faceMatRef = faceMat;
     }
     // ---- jaw + inner mouth ----
     this.jaw = new THREE.Group(); this.face.add(this.jaw);
@@ -76,7 +98,7 @@ export class Dealer {
       const { jaw: jg, M, jp, neck: nk } = this._jawSrc;
       const jaw = jg.applyMatrix4(M.clone().premultiply(new THREE.Matrix4().makeTranslation(-jp.x, -jp.y, -jp.z)));
       this.jaw.position.copy(jp).sub(nk);
-      const jm = new THREE.Mesh(jaw, this.mat); jm.castShadow = true; this.jaw.add(jm);
+      const jm = new THREE.Mesh(jaw, this.faceMatRef); jm.castShadow = true; this.jaw.add(jm);
     }
     const mouthP = toLocal(CX, 0.022, 0.125).sub(neck);
     this.inner = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10), new THREE.MeshBasicMaterial({ color: 0x1a0306 }));
@@ -113,6 +135,8 @@ export class Dealer {
   hitImpact() { this.hit = 1; }
   /** card-flick: right glove snaps up and forward */
   flick() { this.flickT = 1; }
+  /** world position of the right glove's fingertips (card origin) */
+  gloveTip(out = new THREE.Vector3()) { const h = this.hands.find(x => x.s > 0).h; h.updateWorldMatrix(true, false); return h.localToWorld(out.set(0, 0, 0.03)); }
   /** target: world position to look at (active piece); viewer: camera world pos; speak: mouth level 0..1 */
   update(dt, { target, viewer, speak = 0 }) {
     this.t += dt; const t = this.t, e = this.expr;
